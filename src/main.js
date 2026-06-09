@@ -5,6 +5,7 @@ import { FlowerRack } from './objects/FlowerRack.js'
 import { FlowerFoam } from './objects/FlowerFoam.js'
 import { RibbonSystem } from './systems/RibbonSystem.js'
 import { WrappingSystem } from './systems/WrappingSystem.js'
+import { ScoringSystem } from './systems/ScoringSystem.js'
 import { InputManager } from './controls/InputManager.js'
 import { GameState } from './state/GameState.js'
 import { UIManager } from './ui/UIManager.js'
@@ -27,6 +28,7 @@ class App {
     this.flowerFoam = new FlowerFoam(this.sceneManager, this.physicsWorld)
     this.ribbonSystem = new RibbonSystem(this.sceneManager, this.physicsWorld)
     this.wrappingSystem = new WrappingSystem(this.sceneManager)
+    this.scoringSystem = new ScoringSystem()
     
     this.inputManager = new InputManager(
       this.sceneManager,
@@ -74,6 +76,8 @@ class App {
       this.gameState.addStem()
       this.uiManager.addFeedback('success', `花茎插入成功 (${this.insertedStems.length}/${CONFIG.MAX_STEMS})`)
       
+      this.scoringSystem.onStemInserted(stem)
+      
       if (this.insertedStems.length >= CONFIG.MIN_STEMS_FOR_BIND) {
         this.gameState.setCanBind(true)
       }
@@ -89,28 +93,40 @@ class App {
     
     this.ribbonSystem.on('bindForceChange', (force) => {
       this.uiManager.setBindForce(force)
+      this.scoringSystem.onBindForceChange(force)
     })
     
     this.ribbonSystem.on('stemBreak', (stem) => {
       this.uiManager.addFeedback('danger', '花茎折断了！绑扎过紧')
       this._handleStemBreak(stem)
+      this.scoringSystem.onStemBreak()
     })
     
     this.ribbonSystem.on('stemsScatter', () => {
       this.uiManager.addFeedback('warning', '花束散落了！绑扎过松')
       this._handleScatter()
+      this.scoringSystem.onScatter()
     })
     
     this.uiManager.on('reset', () => this._reset())
     this.uiManager.on('bind', () => this._startBinding())
     this.uiManager.on('wrap', () => this._startWrapping())
     this.uiManager.on('next', () => this._nextStage())
+    
+    this.scoringSystem.on('scoreUpdate', (scores) => {
+      this.uiManager.updateScores(scores)
+    })
+    
+    this.scoringSystem.on('complete', (result) => {
+      this.uiManager.showResult(result)
+    })
   }
   
   _init() {
     this.flowerRack.createRack()
     this.flowerFoam.createFoam()
     this.gameState.setStage(1)
+    this.uiManager.updateScores(this.scoringSystem.getCurrentScores())
   }
   
   _onStageChange(stage) {
@@ -135,10 +151,12 @@ class App {
         btnNext.disabled = true
         this.wrappingSystem.startWrapping(this.insertedStems, () => {
           this.uiManager.addFeedback('success', '包装完成！')
-          this.uiManager.hintText.textContent = '🎉 花束制作完成！点击重置可以重新开始'
+          this.uiManager.hintText.textContent = '🎉 花束制作完成！'
           this.uiManager.stageIndicator.textContent = '完成：花束制作完毕'
           this.gameState.setProgress(100)
           document.getElementById('btn-reset').disabled = false
+          
+          this.scoringSystem.complete()
         })
         break
     }
@@ -160,6 +178,7 @@ class App {
       this.uiManager.addFeedback('success', '丝带绑扎完成！')
       this.gameState.setProgress(60)
     }
+    this.scoringSystem.onBindComplete(result)
   }
   
   _handleStemBreak(brokenStem) {
@@ -238,10 +257,13 @@ class App {
     this.flowerRack.reset()
     this.ribbonSystem.reset()
     this.wrappingSystem.reset()
+    this.scoringSystem.reset()
     this.gameState.reset()
     
     this.uiManager.clearFeedback()
     this.uiManager.addFeedback('success', '已重置')
+    this.uiManager.hideResult()
+    this.uiManager.updateScores(this.scoringSystem.getCurrentScores())
   }
   
   _onResize() {
@@ -262,6 +284,25 @@ class App {
     
     this.wrappingSystem.update(dt)
     this.inputManager.update()
+    
+    if (!this.scoringSystem.isComplete && this.scoringSystem.startTime) {
+      const elapsed = (Date.now() - this.scoringSystem.startTime) / 1000
+      const scores = this.scoringSystem.getCurrentScores()
+      const idealTime = 45
+      const maxTime = 180
+      let timeScore
+      if (elapsed <= idealTime) {
+        timeScore = 100
+      } else if (elapsed >= maxTime) {
+        timeScore = 40
+      } else {
+        const ratio = (elapsed - idealTime) / (maxTime - idealTime)
+        timeScore = Math.round(100 - ratio * 60)
+      }
+      scores.time = timeScore
+      scores.elapsed = elapsed
+      this.uiManager.updateScores(scores)
+    }
     
     this.sceneManager.render()
     this.perfMonitor.update()
