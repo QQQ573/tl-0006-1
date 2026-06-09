@@ -2,7 +2,7 @@ import { CONFIG } from '../config.js'
 
 export class GameState {
   constructor() {
-    this._stage = 1
+    this._stage = 0
     this._progress = 0
     this._stemCount = 0
     this._canBind = false

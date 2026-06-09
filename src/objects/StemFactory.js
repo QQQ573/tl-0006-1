@@ -43,7 +43,7 @@ export class StemFactory {
   _cleanupFallen() {
     for (let i = this.stems.length - 1; i >= 0; i--) {
       const stem = this.stems[i]
-      if (stem.body.position.y < -5) {
+      if (stem.body.position.y < -20) {
         this.removeStem(stem)
       }
     }

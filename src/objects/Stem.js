@@ -71,6 +71,7 @@ export class Stem {
     group.position.copy(position)
     this.mesh = group
     this.stemMesh = stemMesh
+    this.mesh.userData = { type: 'stem', stem: this }
   }
   
   _createPhysics(position) {
@@ -109,8 +110,6 @@ export class Stem {
   }
   
   update() {
-    if (this.isHeld) return
-    
     this.mesh.position.copy(this.body.position)
     this.mesh.position.y -= this.height / 2
     

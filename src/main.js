@@ -10,6 +10,7 @@ import { GameState } from './state/GameState.js'
 import { UIManager } from './ui/UIManager.js'
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js'
 import { CONFIG } from './config.js'
+import * as CANNON from 'cannon-es'
 
 class App {
   constructor() {
@@ -33,7 +34,8 @@ class App {
       this.flowerRack,
       this.flowerFoam,
       this.ribbonSystem,
-      this.uiManager
+      this.uiManager,
+      this.stemFactory
     )
     
     this.heldStem = null
@@ -56,13 +58,27 @@ class App {
       this.uiManager.setProgress(progress)
     })
     
+    this.gameState.on('canBindChange', (canBind) => {
+      if (this.gameState.stage === 1) {
+        const btnBind = document.getElementById('btn-bind')
+        btnBind.disabled = !canBind
+      }
+    })
+    
+    this.gameState.on('stemCountChange', (count) => {
+      this.uiManager.setStemCount(count)
+    })
+    
     this.flowerFoam.on('stemInserted', (stem) => {
       this.insertedStems.push(stem)
       this.gameState.addStem()
       this.uiManager.addFeedback('success', `花茎插入成功 (${this.insertedStems.length}/${CONFIG.MAX_STEMS})`)
       
-      if (this.insertedStems.length >= CONFIG.MAX_STEMS) {
+      if (this.insertedStems.length >= CONFIG.MIN_STEMS_FOR_BIND) {
         this.gameState.setCanBind(true)
+      }
+      
+      if (this.insertedStems.length >= CONFIG.MAX_STEMS) {
         this.uiManager.addFeedback('success', '花茎已全部插好，可以绑扎丝带了')
       }
     })
@@ -161,8 +177,23 @@ class App {
   _handleScatter() {
     for (const stem of this.insertedStems) {
       this.flowerFoam.releaseStem(stem)
-      stem.body.mass = 0.5
-      stem.body.type = 1
+      stem.body.type = CANNON.Body.DYNAMIC
+      stem.body.mass = CONFIG.STEM_MASS
+      
+      const scatterForce = new CANNON.Vec3(
+        (Math.random() - 0.5) * 4,
+        2 + Math.random() * 2,
+        (Math.random() - 0.5) * 4
+      )
+      stem.body.applyImpulse(scatterForce, stem.body.position)
+      
+      const torque = new CANNON.Vec3(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2
+      )
+      stem.body.applyTorque(torque)
+      
       stem.body.wakeUp()
     }
     this.insertedStems = []
@@ -188,6 +219,18 @@ class App {
       this.stemFactory.removeStem(stem)
     }
     this.insertedStems = []
+    
+    if (this.inputManager && this.inputManager.heldStem) {
+      this.stemFactory.removeStem(this.inputManager.heldStem)
+      this.inputManager.heldStem = null
+    }
+    
+    const allStems = [...this.stemFactory.stems]
+    for (const stem of allStems) {
+      if (!stem.rackSlot) {
+        this.stemFactory.removeStem(stem)
+      }
+    }
     
     this.flowerRack.reset()
     this.ribbonSystem.reset()
