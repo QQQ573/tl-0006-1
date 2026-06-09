@@ -30,7 +30,7 @@ export const CONFIG = {
   
   TAP_COOLDOWN_MS: 300,
   
-  WRAP_DURATION: 2.5,
+  WRAP_DURATION: 1.5,
   
   COLORS: {
     stem: 0x228B22,

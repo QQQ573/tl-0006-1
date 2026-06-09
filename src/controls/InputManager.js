@@ -202,47 +202,32 @@ export class InputManager {
     
     this.raycaster.setFromCamera(mouse, this.sceneManager.camera)
     
-    const rackSlots = this.flowerRack.getSlots()
-    const rackIntersects = this.raycaster.intersectObjects(rackSlots, true)
-    
-    if (rackIntersects.length > 0) {
-      let slotMesh = null
-      for (const hit of rackIntersects) {
-        slotMesh = this.flowerRack.getSlotMesh(hit.object)
-        if (slotMesh && slotMesh.userData.occupied) break
-      }
-      
-      if (slotMesh && slotMesh.userData.occupied) {
-        this._lastTapTime = now
-        const stem = this.flowerRack.pickStem(slotMesh)
-        if (stem) {
-          this.heldStem = stem
-          this.uiManager.addFeedback('success', '已拿起花茎，拖到花泥处插入')
-        }
-        return
-      }
-    }
-    
-    const groundStems = this.stemFactory.stems.filter(s => 
-      !s.isInserted && !s.isHeld && s.body.position.y < CONFIG.STEM_HEIGHT * 0.6
+    const pickableStems = this.stemFactory.stems.filter(s => 
+      !s.isInserted && !s.isHeld && !s.isBroken
     )
-    const stemMeshes = groundStems.map(s => s.mesh)
+    const stemMeshes = pickableStems.map(s => s.mesh)
     
     if (stemMeshes.length > 0) {
-      const stemIntersects = this.raycaster.intersectObjects(stemMeshes, true)
+      const intersects = this.raycaster.intersectObjects(stemMeshes, true)
       
-      if (stemIntersects.length > 0) {
+      if (intersects.length > 0) {
         this._lastTapTime = now
-        let stemObj = stemIntersects[0].object
+        let stemObj = intersects[0].object
         while (stemObj && !stemObj.userData?.stem) {
           stemObj = stemObj.parent
         }
         
         if (stemObj?.userData?.stem) {
           const stem = stemObj.userData.stem
-          stem.setHeld(true)
+          
+          if (stem.rackSlot) {
+            this.flowerRack.pickStem(stem.rackSlot)
+          } else {
+            stem.setHeld(true)
+          }
+          
           this.heldStem = stem
-          this.uiManager.addFeedback('success', '已拾起花茎，拖到花泥处插入')
+          this.uiManager.addFeedback('success', '已拿起花茎，拖到花泥处插入')
         }
       }
     }

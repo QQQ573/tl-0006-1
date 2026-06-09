@@ -135,7 +135,10 @@ class App {
         btnNext.disabled = true
         this.wrappingSystem.startWrapping(this.insertedStems, () => {
           this.uiManager.addFeedback('success', '包装完成！')
+          this.uiManager.hintText.textContent = '🎉 花束制作完成！点击重置可以重新开始'
+          this.uiManager.stageIndicator.textContent = '完成：花束制作完毕'
           this.gameState.setProgress(100)
+          document.getElementById('btn-reset').disabled = false
         })
         break
     }
